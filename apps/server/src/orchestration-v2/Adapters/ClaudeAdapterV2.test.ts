@@ -3621,7 +3621,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           assert.deepEqual(yield* Fiber.join(cancelled), { action: "cancel" });
           assert.deepEqual(appNames(), ["Titled"]);
 
-          // An approval choice and a default fill the accepted content.
+          // An approval choice fills the accepted content; an optional default is omitted.
           const chosen = yield* elicit(
             {
               serverName: "srv",
@@ -3645,7 +3645,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           });
           assert.deepEqual(yield* Fiber.join(chosen), {
             action: "accept",
-            content: { choice: "once", note: "ok" },
+            content: { choice: "once" },
           });
           assert.deepEqual(appNames(), ["Titled", "Display"]);
 

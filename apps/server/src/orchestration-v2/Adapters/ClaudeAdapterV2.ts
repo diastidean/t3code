@@ -2455,7 +2455,9 @@ export function resolveClaudeElicitationAcceptance(
   const content = response.content;
   if (Object.keys((properties ?? {}) as Record<string, unknown>).length > 0 && !content)
     return null;
-  const requiredKeys = new Set<string>(schema?.required ?? []);
+  const requiredKeys = new Set<string>(
+    Array.isArray(schema?.required) ? (schema.required as string[]) : [],
+  );
   const validatedContent: Record<string, string | number | boolean> = {};
   for (const [key, value] of Object.entries(content ?? {})) {
     if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
