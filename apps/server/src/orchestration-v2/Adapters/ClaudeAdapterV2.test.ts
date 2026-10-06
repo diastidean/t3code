@@ -3216,7 +3216,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           required: ["choice", "mode"],
         },
       }),
-      { action: "accept", content: { choice: "once", mode: "approve", note: "ok" } },
+      { action: "accept", content: { choice: "once", mode: "approve" } },
     );
     // oneOf and enum are both enforced: the accepted value is in their intersection.
     assert.deepEqual(
@@ -3387,6 +3387,60 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           required: [1],
         },
       }),
+    );
+    // Free-form defaults are never forwarded: persistent-looking or not, an
+    // optional default is omitted and a required one fails closed.
+    const field = (definition: Record<string, unknown>, required: boolean) => ({
+      ...base,
+      requestedSchema: {
+        type: "object",
+        properties: { f: definition },
+        ...(required ? { required: ["f"] } : {}),
+      },
+    });
+    const unsupported: Array<Record<string, unknown>> = [
+      { type: "boolean", title: "Remember", default: true },
+      { type: "boolean", default: true },
+      { type: "string", title: "Always allow", default: "yes" },
+      { type: "string", default: "always" },
+      { type: "string", title: "Note", default: "session kickoff" },
+      { type: "number", default: 5 },
+    ];
+    for (const definition of unsupported) {
+      assert.isNull(accept(field(definition, true)), JSON.stringify(definition));
+      assert.deepEqual(accept(field(definition, false)), empty, JSON.stringify(definition));
+    }
+    // Benign optional text containing "session" is accepted, not falsely declined.
+    assert.deepEqual(
+      accept(field({ type: "string", title: "Optional note", default: "session kickoff" }, false)),
+      empty,
+    );
+    // An explicit false is provably non-persistent and still forwarded.
+    for (const required of [true, false]) {
+      assert.deepEqual(
+        accept(field({ type: "boolean", title: "Remember", default: false }, required)),
+        { action: "accept", content: { f: false } },
+      );
+    }
+    // Persistence-named booleans are answered false by the Codex helper.
+    assert.deepEqual(
+      accept(field({ type: "boolean", title: "Always allow", default: true }, true)),
+      { action: "accept", content: { f: false } },
+    );
+    // Valid one-time choices alongside an omitted optional default.
+    assert.deepEqual(
+      accept({
+        ...base,
+        requestedSchema: {
+          type: "object",
+          properties: {
+            choice: { type: "string", enum: ["allow_once", "allow_always"] },
+            remember: { type: "boolean", title: "Remember", default: true },
+          },
+          required: ["choice"],
+        },
+      }),
+      { action: "accept", content: { choice: "allow_once" } },
     );
     const acceptance = { action: "accept" as const, content: { choice: "once" } };
     assert.deepEqual(

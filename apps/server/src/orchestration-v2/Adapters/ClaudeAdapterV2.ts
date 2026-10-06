@@ -2455,6 +2455,7 @@ export function resolveClaudeElicitationAcceptance(
   const content = response.content;
   if (Object.keys((properties ?? {}) as Record<string, unknown>).length > 0 && !content)
     return null;
+  const requiredKeys = new Set<string>(schema?.required ?? []);
   const validatedContent: Record<string, string | number | boolean> = {};
   for (const [key, value] of Object.entries(content ?? {})) {
     if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
@@ -2478,12 +2479,20 @@ export function resolveClaudeElicitationAcceptance(
     if (enumOptions && !enumOptions.includes(value as string)) return null;
     // Codex matches substrings for approval choices (e.g. "disallow" matches
     // "allow"). Never send a negative or persistent choice as one-time consent.
-    if (
-      (oneOfOptions || enumOptions) &&
-      !(typeof value === "string" && SAFE_ONE_TIME_CHOICE.test(value))
-    )
+    if (oneOfOptions || enumOptions) {
+      if (!(typeof value === "string" && SAFE_ONE_TIME_CHOICE.test(value))) return null;
+      validatedContent[key] = value;
+      continue;
+    }
+    // Free-form values come from schema defaults the user never sees, and field
+    // names or wording cannot reliably tell a persistent grant from a benign
+    // value. Only an explicit false is provably non-persistent; any other value
+    // is dropped when optional and fails the form closed when required.
+    if (value === false) {
+      validatedContent[key] = value;
+    } else if (requiredKeys.has(key)) {
       return null;
-    validatedContent[key] = value;
+    }
   }
   return { action: "accept", content: validatedContent };
 }
